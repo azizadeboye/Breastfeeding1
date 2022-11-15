@@ -1,0 +1,162 @@
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+library(car)
+library(broom)
+library(autoReg)
+library(rrtable)
+library(dplyr)
+
+#gaze(infantdeath~.,data=childs)
+ # for use of `%>%`
+ft=gaze(infantdeath~.,data=child) %>% myft()
+ft
+ft=gaze(binitiation~.,data=child) %>% myft()
+ft=gaze(bpi~.,data=child) %>% myft()
+##eval=FALSE
+#table2pptx(ft)
+table2docx(ft)
+
+# use maxit for glm.fit: algorithm did not converge
+fit1=glm(breastfeed~., data=child,family="binomial", maxit=100)
+summary(fit1)
+autoReg(fit1)
+autoReg(fit1) %>% myft()
+
+child$agecat=factor(child$agecat,labels=c("15-20","21-30", "31-40", "41-50"))
+child$region=factor(child$region,labels=c("Western Cape","Eastern Cape", "Northern Cape", 
+                                          "Free State", "KwaZulu-Natal", "North West", 
+                                          "Gauteng", "Mpumalanga", "Limpopo"))
+child$residence=factor(child$residence,labels=c("Urban", "Rural"))
+child$educationM=factor(child$educationM,labels=c("No education", "Primary", "Secondary", 
+                                                  "Higher"))
+child$ethnicity=factor(child$ethnicity,labels=c("Black","White", "Coloured", "Indian/Asian"))
+child$wealth=factor(child$wealth, labels = c("Poor", "Middle", "Rich"))
+child$contraceptive=factor(child$contraceptive, labels = c("No", "Yes"))
+child$marital=factor(child$marital, labels = c("Never married", "Married", "Living with partner", 
+                                               "Widowed", "Divorced", "Separated"))
+child$birthorder=factor(child$birthorder, labels = c("1st", "2nd", "3+"))
+child$plurality=factor(child$plurality, labels = c("Single", "Multiple"))
+child$childgender=factor(child$childgender, labels = c("Male", "Female"))
+child$infantdeath=factor(child$infantdeath, labels = c("Dead", "Alive"))
+child$childdelivery=factor(child$childdelivery, labels = c("Home", "Government hospital", 
+                                                           "Private hospital", "Others"))
+child$childsize=factor(child$childsize, labels = c("Big", "Average", "Small"))
+child$antenatalcare=factor(child$antenatalcare, labels = c("No", "Yes"))
+child$postnatalcare=factor(child$postnatalcare, labels = c("No", "Yes"))
+child$childhealthcheck=factor(child$childhealthcheck, labels = c("No", "Yes"))
+child$binitiation=factor(child$binitiation, labels = c("Ever", "Never"))
+child$bpi=factor(child$bpi, labels = c("Low BPI", "High BPI"))
+  
+
+child$agecat=setLabel(child$agecat, "Maternal age")
+child$region=setLabel(child$region, "Region")
+child$residence=setLabel(child$residence, "Type of residence")
+child$educationM=setLabel(child$educationM, "Maternal education")
+child$ethnicity=setLabel(child$ethnicity, "Ethnicity")
+child$wealth=setLabel(child$wealth, "Wealth index")
+child$contraceptive=setLabel(child$contraceptive, "Using contraceptive")
+child$marital=setLabel(child$marital, "Maternal marital")
+child$birthorder=setLabel(child$birthorder, "Birth order")
+child$plurality=setLabel(child$plurality, "Birth type")
+child$childgender=setLabel(child$childgender, "Child gender")
+child$infantdeath=setLabel(child$infantdeath, "Infant mortality")
+child$childdelivery=setLabel(child$childdelivery, "Place of delivery")
+child$childsize=setLabel(child$childsize, "Size of child at birth")
+child$antenatalcare=setLabel(child$antenatalcare, "Antenatal care received")
+child$postnatalcare=setLabel(child$postnatalcare, "Postnatal care received")
+child$childhealthcheck=setLabel(child$childhealthcheck, "Child's health checked")
+child$binitiation=setLabel(child$binitiation, "Breastfeeding initiation")
+child$bpi=setLabel(child$bpi, "Breastfeeding performance index")
+
+fit2=glm(bpi~agecat+residence+educationM+ethnicity+wealth+contraceptive+marital
+         +birthorder+plurality+childgender+childdelivery+childsize+antenatalcare+
+           postnatalcare+childhealthcheck, data=child, family="binomial")
+result=autoReg(fit2) 
+result %>% myft()
+df <- autoReg(fit2, uni=TRUE) %>% myft()
+table2docx(df)
+autoReg(fit2, uni=TRUE,threshold=1) %>% myft()
+
+fit3=glm(binitiation~agecat+residence+educationM+ethnicity+wealth+
+           contraceptive+marital+birthorder+plurality+childgender+childdelivery
+         +childsize+antenatalcare+postnatalcare+childhealthcheck, data=child, 
+         family="binomial")
+result=autoReg(fit3) 
+result %>% myft()
+df1 <- autoReg(fit3, uni=TRUE) %>% myft()
+table2docx(df1)
+autoReg(fit3, uni=TRUE,threshold=1) %>% myft()
+
+fit4=glm(infantdeath~bpi+binitiation, data=child, family="binomial")
+result=autoReg(fit4) 
+result %>% myft()
+df2 <- autoReg(fit4, uni=TRUE) %>% myft()
+table2docx(df2)
+x=modelPlot(fit4)
+x
+plot2pptx(print(x))
+modelPlot(fit4,uni=TRUE,threshold=1,show.ref=FALSE)
+
+## Prediction
+
+library(breakDown)
+library(ggplot2)
+
+# Explanations for the linear predictor.
+predict(fit2, child[11,], type = "link")
+explain_1 <- broken(fit2, child[11,])
+explain_1
+plot(explain_1) + ggtitle("breakDown plot for predictors")
+plot2pptx(print(plot(explain_1) + ggtitle("Predicted plot for predictors")))
+
+#Explanations for the probability with intercept set as an origin.
+
+predict(fit2, child[11,], type = "response")
+explain_1 <- broken(fit2, child[11,], baseline = "intercept")
+explain_1
+plot(explain_1, trans = function(x) exp(x)/(1+exp(x))) + 
+  ggtitle("Predicted probability of breastfeeding performance index") +
+  scale_y_continuous( limits = c(0,1), name = "probability", expand = c(0,0))
+
+# Explanations for the linear predictor.
+predict(fit3, child[11,], type = "link")
+explain_1 <- broken(fit3, child[11,])
+explain_1
+plot(explain_1) + ggtitle("breakDown plot for predictors")
+plot2pptx(print(plot(explain_1) + ggtitle("Predicted plot for predictors")))
+
+#Explanations for the probability with intercept set as an origin.
+
+predict(fit3, child[11,], type = "response")
+explain_1 <- broken(fit3, child[11,], baseline = "intercept")
+explain_1
+plot(explain_1, trans = function(x) exp(x)/(1+exp(x))) + 
+  ggtitle("Predicted probability of breastfeeding performance index") +
+  scale_y_continuous( limits = c(0,1), name = "probability", expand = c(0,0))
+
+
+## Predicted probabilities for the logit model
+
+m1 <- glm(y ~ x, family = binomial(link = "logit"))
+pout_logit <- predict(fit2, child, se.fit = TRUE, type = "response")$fit
+
+pse_logit <- predict(fit2, child, se.fit = TRUE, type = "response")$se.fit
+pupper_logit <- pout_logit + (1.96 * pse_logit)  # 95% CI upper bound
+plower_logit <- pout_logit - (1.96 * pse_logit)  # 95% CI lower bound
+
+with(child, plot(pout_logit ~ bpi, type = "l", lwd = 2))
+with(child, plot(pout_logit ~ binitiation, type = "l", lwd = 2))
+with(child, plot(pout_logit ~ infantdeath, type = "l", lwd = 2))
+with(child, plot(pout_logit ~ agecat, type = "l", lwd = 2))
+with(child, lines(pupper_logit ~ agecat, type = "l", lty = 2)) #works for continuous or count
+with(child, lines(plower_logit ~ agecat, type = "l", lty = 2)) #works for continuous or count
+
+
+x=modelPlot(fit3)
+x
+plot2pptx(print(x))
+
+modelPlot(fit3,uni=TRUE,threshold=1,show.ref=FALSE)
+
+plot(fit3, trans=function(x)exp(x)/(1+exp(x)), shade=T, pages=1)
