@@ -1,0 +1,54 @@
+rows_with_NAs <- which(rowSums(is.na(childM)) > 0)
+complete_row_df <- childM[-rows_with_NAs,]
+nrow(complete_row_df)
+
+most_common_value <- function(vec){
+  return(as.integer(names(sort(table(vec), decreasing=TRUE))[1]))
+  }
+
+for(r in rows_with_NAs){
+target_row <- childM[r, ]
+missing_cols <- names(target_row)[as.logical(is.na(target_row))]
+complete_row_without_col <- complete_row_df %>% select(-all_of(missing_cols))
+    
+target_row_clean <- target_row %>% select(-all_of(missing_cols))
+
+difference_count <- apply(complete_row_without_col, MARGIN = 1, function(x){sum(xor(x, target_row_clean))})
+rows_with_min_diff <- which(difference_count == min(difference_count))
+min_diff_data <- complete_row_df[rows_with_min_diff, missing_cols, drop=FALSE]
+imputed_values <- sapply(min_diff_data, most_common_value)
+childM[r, missing_cols] <- imputed_values
+  }
+
+missingness_df <- childM %>%
+  rowwise() %>%
+  mutate(NumMissing = sum(is.na(c_across(antenatalcare:breastfeddinitiation))),
+         MissingPattern = paste0(1*is.na(c_across(antenatalcare:breastfeddinitiation)), collapse="")) %>%
+  select(NumMissing, MissingPattern)
+
+missingness_df$Row <- 1:nrow(missingness_df)
+missingness_df <- missingness_df %>%
+  group_by(NumMissing, MissingPattern) %>%
+  group_data() %>%
+  filter(NumMissing > 0)
+
+for(mr in 1:nrow(missingness_df)){
+  pattern <- missingness_df[mr,]$MissingPattern
+  missing_columns <- (unlist(strsplit(pattern, split = "")) == "1")
+  missing_row_indices <- missingness_df[mr,]$.rows[[1]]
+  
+  complete_rows <- childM %>% select(antenatalcare:breastfeddinitiation) %>% complete.cases() %>% 
+    filter(childM, .)
+  complete_row_without_col <- complete_rows[, !missing_columns]
+  
+  for(r in missing_row_indices){
+    target_row_clean <- childM[r, !missing_columns]
+    
+    difference_count <- apply(complete_row_without_col, MARGIN = 1, 
+                              function(x){sum(xor(x, target_row_clean))})
+    rows_with_min_diff <- which(difference_count == min(difference_count))
+    min_diff_data <- complete_rows[rows_with_min_diff, , drop=FALSE]
+    imputed_values <- sapply(min_diff_data, most_common_value)
+    childM[r, ] <- imputed_values
+  }
+}
